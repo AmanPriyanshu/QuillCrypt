@@ -9,21 +9,20 @@ POSTS_DB_FILE = "posts_db.json"
 POSTS_DIR = "posts"
 
 ##########################################
-# 1. CONFIGURATION & POSTS DATABASE
+# 1. BLOG CONFIGURATION & POSTS DATABASE
 ##########################################
 
 def get_blog_config():
     """
-    Load (or set up) the blog configuration.
-    The blog configuration includes the blog's name and a default author.
+    Load (or create) the blog configuration (blog name and default author).
     """
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             config = json.load(f)
     else:
         st.subheader("Blog Setup")
-        blog_name = st.text_input("Enter the Blog Name", placeholder="Literary Musings")
-        default_author = st.text_input("Enter the Default Author", placeholder="John Doe")
+        blog_name = st.text_input("Enter the Blog Name", placeholder="My Literary Blog")
+        default_author = st.text_input("Enter the Default Author", placeholder="Jane Doe")
         if st.button("Save Blog Configuration"):
             if blog_name.strip() == "":
                 st.error("Blog name cannot be empty.")
@@ -38,7 +37,7 @@ def get_blog_config():
     return config
 
 def load_posts_db():
-    """Load the posts database (list of post metadata)."""
+    """Load the posts database (a list of post metadata)."""
     if os.path.exists(POSTS_DB_FILE):
         with open(POSTS_DB_FILE, "r", encoding="utf-8") as f:
             posts = json.load(f)
@@ -52,19 +51,19 @@ def save_posts_db(posts):
         json.dump(posts, f, indent=2)
 
 def update_posts_db(new_post):
-    """Append a new post's metadata to the posts database."""
+    """Append a new post’s metadata to the posts database."""
     posts = load_posts_db()
     posts.append(new_post)
     save_posts_db(posts)
 
 ##########################################
-# 2. GENERATE INDEX.HTML
+# 2. GENERATE INDEX.HTML WITH CUSTOM CSS
 ##########################################
 
 def generate_index_html(config):
     """
-    Generate an index.html file in the root directory.
-    It lists all posts (with links to posts/<id>.html).
+    Generate an index.html file in the root directory that lists all posts.
+    Uses custom inline CSS (no Tailwind).
     """
     posts = load_posts_db()
     posts_items = ""
@@ -75,40 +74,61 @@ def generate_index_html(config):
         title = post["title"]
         date_str = post["date"]
         author = post["author"]
-        posts_items += f'<li class="mb-4"><a href="posts/{post_id}.html" class="text-blue-600 hover:underline">{title}</a> <span class="text-gray-600 text-sm">- {date_str} by {author}</span></li>\n'
+        posts_items += f'<li><a href="posts/{post_id}.html">{title}</a> <span style="color:#666;font-size:0.9em;">- {date_str} by {author}</span></li>\n'
     index_html = f"""<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{config['blog_name']} - Home</title>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
   <style>
-      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap');
-      .title-font {{ font-family: 'Playfair Display', serif; }}
-      .prose {{ max-width: 65ch; line-height: 1.8; }}
+    body {{
+      font-family: Georgia, serif;
+      background-color: #fff;
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }}
+    header {{
+      background-color: #f5f5f5;
+      padding: 20px;
+      text-align: center;
+    }}
+    header h1 {{
+      margin: 0;
+      font-size: 2.5em;
+    }}
+    .container {{
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+    }}
+    ul {{
+      list-style-type: disc;
+      margin-left: 40px;
+    }}
+    li {{
+      margin-bottom: 10px;
+    }}
+    a {{
+      text-decoration: none;
+      color: #333;
+    }}
+    a:hover {{
+      color: #555;
+    }}
   </style>
 </head>
-<body class="bg-gray-50">
-  <nav class="border-b border-gray-200 bg-white">
-      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div class="flex justify-between h-16">
-              <div class="flex">
-                  <div class="flex-shrink-0 flex items-center">
-                      <h1 class="title-font text-xl text-gray-900">{config['blog_name']}</h1>
-                  </div>
-              </div>
-          </div>
-      </div>
-  </nav>
-  <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div class="prose mx-auto">
-          <h2 class="text-3xl mb-6">Posts</h2>
-          <ul>
-            {posts_items}
-          </ul>
-      </div>
-  </main>
+<body>
+  <header>
+    <h1>{config['blog_name']}</h1>
+  </header>
+  <div class="container">
+    <h2>Posts</h2>
+    <ul>
+      {posts_items}
+    </ul>
+  </div>
 </body>
 </html>
 """
@@ -116,38 +136,38 @@ def generate_index_html(config):
         f.write(index_html)
 
 ##########################################
-# 3. SIMPLE ENCRYPTION FUNCTION
+# 3. ENCRYPTION FUNCTION
 ##########################################
 
 def encrypt_post(plaintext, password):
     """
-    Encrypt the plaintext using AES-CBC.
-    This version derives the key directly as SHA-256(password) and uses a random IV.
-    Returns a JSON string with:
+    Encrypt the plaintext (Markdown content) using AES-CBC.
+    The key is derived as SHA-256(password) (for simplicity) and a random IV is used.
+    Returns a JSON string containing:
       - "ct": Base64-encoded ciphertext
-      - "iv": IV as hex
+      - "iv": IV as hex string
     """
     iv = secrets.token_bytes(16)
-    key = hashlib.sha256(password.encode()).digest()  # Simplified key derivation
+    key = hashlib.sha256(password.encode()).digest()  # simplified key derivation
     cipher = AES.new(key, AES.MODE_CBC, iv)
-    ciphertext = cipher.encrypt(pad(plaintext.encode('utf-8'), AES.block_size))
+    ciphertext = cipher.encrypt(pad(plaintext.encode("utf-8"), AES.block_size))
     encrypted_data = {
-         "ct": base64.b64encode(ciphertext).decode('utf-8'),
-         "iv": iv.hex()
+        "ct": base64.b64encode(ciphertext).decode("utf-8"),
+        "iv": iv.hex()
     }
     return json.dumps(encrypted_data)
 
 ##########################################
-# 4. GENERATE POST.HTML (INLINE CSS/JS)
+# 4. GENERATE POST.HTML WITH CUSTOM CSS/JS
 ##########################################
 
 def generate_post_html(config, post_metadata, encrypted_content, used_password):
     """
-    Generate an HTML file for a single post with all CSS and JavaScript inline.
-    
-    - For a protected post (user-supplied password), a password input is shown.
-    - For a public post, an auto-generated password is embedded (via autoDecryptKey)
-      so that visitors need only click a button to decrypt.
+    Generate an HTML file for a single post.
+    Uses custom inline CSS (no Tailwind) designed to render Markdown correctly.
+    For protected posts, the visitor must enter a password; for public posts, the auto-generated key is embedded.
+    Inline JavaScript loads CryptoJS and markdown‑it (via CDN) to decrypt the content and render it.
+    (Note: literal curly braces in the JavaScript are doubled as {{ and }}.)
     """
     post_id     = post_metadata["id"]
     post_title  = post_metadata["title"]
@@ -156,26 +176,18 @@ def generate_post_html(config, post_metadata, encrypted_content, used_password):
     is_protected = post_metadata["protected"]
 
     if is_protected:
-        # Do not embed the key; require visitor to type it.
         protection_block = f'''
-          <div id="protectedContent" class="mt-8 p-6 bg-gray-100 rounded-lg">
-              <p class="text-gray-600 text-center">This content is protected. Enter password to view:</p>
-              <div class="flex justify-center mt-4">
-                  <input type="password" id="passwordInput" class="border rounded px-4 py-2 mr-2">
-                  <button onclick="decryptContent(document.getElementById('passwordInput').value)" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700">
-                      Unlock
-                  </button>
-              </div>
+          <div id="protectedContent" style="margin-top:20px; padding:10px; background-color:#f0f0f0; text-align:center;">
+              <p style="color:#666;">This content is protected. Enter password to view:</p>
+              <input type="password" id="passwordInput" style="padding:8px; font-size:1em; margin-right:10px;">
+              <button class="button" onclick="decryptContent(document.getElementById('passwordInput').value)">Unlock</button>
           </div>
         '''
         auto_decrypt_script = ""
     else:
-        # For public posts, embed the auto-generated key so that decryption works on button-click.
         protection_block = '''
-          <div id="publicDecrypt" class="mt-8 text-center">
-              <button onclick="decryptContent(autoDecryptKey)" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700">
-                  Decrypt Post
-              </button>
+          <div id="publicDecrypt" style="margin-top:20px; text-align:center;">
+              <button class="button" onclick="decryptContent(autoDecryptKey)">Decrypt Post</button>
           </div>
         '''
         auto_decrypt_script = f'var autoDecryptKey = "{used_password}";'
@@ -186,50 +198,117 @@ def generate_post_html(config, post_metadata, encrypted_content, used_password):
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{post_title} - {config['blog_name']}</title>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
   <style>
-      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap');
-      .title-font {{ font-family: 'Playfair Display', serif; }}
-      .prose {{ max-width: 65ch; line-height: 1.8; }}
+    body {{
+      font-family: Georgia, serif;
+      background-color: #fff;
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }}
+    header {{
+      background-color: #f5f5f5;
+      padding: 20px;
+      text-align: center;
+    }}
+    header h1 {{
+      margin: 0;
+      font-size: 2.5em;
+    }}
+    .container {{
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+    }}
+    .post-header {{
+      border-bottom: 1px solid #ccc;
+      margin-bottom: 20px;
+    }}
+    .post-header h1 {{
+      margin: 0;
+      font-size: 2em;
+    }}
+    .post-header p {{
+      color: #666;
+      font-size: 0.9em;
+    }}
+    .content {{
+      margin-top: 20px;
+    }}
+    /* Markdown styling */
+    .markdown-content h1 {{
+      font-size: 2em;
+      margin-bottom: 0.5em;
+    }}
+    .markdown-content h2 {{
+      font-size: 1.8em;
+      margin-bottom: 0.5em;
+    }}
+    .markdown-content h3 {{
+      font-size: 1.5em;
+      margin-bottom: 0.5em;
+    }}
+    .markdown-content p {{
+      margin-bottom: 1em;
+      line-height: 1.6;
+    }}
+    .markdown-content ul, .markdown-content ol {{
+      margin: 1em 0;
+      padding-left: 40px;
+    }}
+    .markdown-content li {{
+      margin-bottom: 0.5em;
+    }}
+    .markdown-content table {{
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1em;
+    }}
+    .markdown-content th, .markdown-content td {{
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }}
+    .button {{
+      background-color: #333;
+      color: #fff;
+      border: none;
+      padding: 10px 15px;
+      font-size: 1em;
+      cursor: pointer;
+    }}
+    .button:hover {{
+      background-color: #555;
+    }}
   </style>
 </head>
-<body class="bg-gray-50">
-  <nav class="border-b border-gray-200 bg-white">
-      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div class="flex justify-between h-16">
-              <div class="flex">
-                  <div class="flex-shrink-0 flex items-center">
-                      <h1 class="title-font text-xl text-gray-900">{config['blog_name']}</h1>
-                  </div>
-              </div>
-          </div>
-      </div>
-  </nav>
-  <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <article class="prose mx-auto">
-          <header class="mb-8">
-              <h1 class="title-font text-4xl text-gray-900 mb-4">{post_title}</h1>
-              <div class="flex items-center text-gray-600 text-sm">
-                  <span>{post_date}</span>
-                  <span class="mx-2">·</span>
-                  <span>{post_author}</span>
-              </div>
-          </header>
-          <div id="postContent">
-              <!-- Decrypted content will appear here -->
-          </div>
-          <!-- The encrypted data (as JSON) is stored in a hidden textarea -->
-          <textarea id="encryptedData" style="display:none;">{encrypted_content}</textarea>
-          {protection_block}
-      </article>
-  </main>
-  <!-- Inline JavaScript: Load CryptoJS from CDN and add decryption logic -->
+<body>
+  <header>
+    <h1>{config['blog_name']}</h1>
+  </header>
+  <div class="container">
+    <div class="post-header">
+      <h1>{post_title}</h1>
+      <p>{post_date} &nbsp;&bull;&nbsp; {post_author}</p>
+    </div>
+    <div class="content" id="postContent">
+      <!-- Decrypted & rendered Markdown will appear here -->
+    </div>
+    <!-- The encrypted data is stored in a hidden textarea -->
+    <textarea id="encryptedData" style="display:none;">{encrypted_content}</textarea>
+    {protection_block}
+  </div>
+  <!-- Inline JavaScript: Load CryptoJS and markdown-it from CDNs, then add decryption logic -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
   <script>
+      // Create a markdown-it instance with options.
+      var md = window.markdownit({{ html: true, linkify: true, typographer: true }});
+      
       function decryptContent(password) {{
           var encryptedData = JSON.parse(document.getElementById('encryptedData').textContent);
           var iv = CryptoJS.enc.Hex.parse(encryptedData.iv);
-          // Derive the key by simply taking SHA-256 of the password
+          // Derive the key by taking SHA-256 of the password.
           var key = CryptoJS.SHA256(password);
           var decrypted = CryptoJS.AES.decrypt(
               {{ ciphertext: CryptoJS.enc.Base64.parse(encryptedData.ct) }},
@@ -238,7 +317,8 @@ def generate_post_html(config, post_metadata, encrypted_content, used_password):
           );
           var plaintext = decrypted.toString(CryptoJS.enc.Utf8);
           if (plaintext) {{
-              document.getElementById('postContent').innerHTML = plaintext;
+              var htmlContent = md.render(plaintext);
+              document.getElementById('postContent').innerHTML = '<div class="markdown-content">' + htmlContent + '</div>';
               var protDiv = document.getElementById('protectedContent');
               if (protDiv) protDiv.style.display = 'none';
               var pubDiv = document.getElementById('publicDecrypt');
@@ -253,10 +333,8 @@ def generate_post_html(config, post_metadata, encrypted_content, used_password):
 </body>
 </html>
 """
-    # Ensure the posts directory exists
     if not os.path.exists(POSTS_DIR):
         os.makedirs(POSTS_DIR)
-    # Write the post HTML to posts/<id>.html
     post_filename = os.path.join(POSTS_DIR, f"{post_id}.html")
     with open(post_filename, "w", encoding="utf-8") as f:
         f.write(post_html)
@@ -266,17 +344,17 @@ def generate_post_html(config, post_metadata, encrypted_content, used_password):
 ##########################################
 
 def main():
-    st.title("Encryption‑Based Blog Creator")
+    st.title("Custom CSS Encryption‑Based Blog Creator")
     config = get_blog_config()  # Loads blog name and default author; stops if not configured
     
     st.subheader("Create a New Post")
     post_title   = st.text_input("Post Title")
     post_date    = st.date_input("Post Date", datetime.date.today())
-    post_content = st.text_area("Post Content (Markdown or plain text)", height=300)
-    # Allow overriding the default author
-    post_author  = st.text_input("Author", value=config.get("default_author", ""))
+    post_content = st.text_area("Post Content (Markdown supported)", height=300)
+    # Optionally override default author
+    post_author  = st.text_input("Author", value=config.get("default_author", "Anonymous"))
     
-    # Checkbox: if checked, the post will be password‑protected.
+    # Option to password-protect this post.
     protected = st.checkbox("Password protect this post?")
     user_password = ""
     if protected:
@@ -288,8 +366,8 @@ def main():
             st.error("Post Title and Content are required.")
             return
         
-        # For protected posts the user must supply a password.
-        # For public posts, we generate an auto key that will be embedded.
+        # For protected posts, use the user-supplied password.
+        # For public posts, auto-generate a key that will be embedded.
         if protected:
             if user_password.strip() == "":
                 st.error("Please enter a password for this protected post.")
@@ -312,7 +390,7 @@ def main():
         # Generate the post HTML file.
         generate_post_html(config, post_metadata, encrypted_content, used_password)
         
-        # Update posts database and (re)generate index.html.
+        # Update the posts database and regenerate index.html.
         update_posts_db(post_metadata)
         generate_index_html(config)
         
